@@ -562,3 +562,79 @@ func (h *TaskHandler) getTaskByID(id int) (*Task, error) {
 	}
 	return &t, nil
 }
+
+type DuplicateMatch struct {
+	Task
+	Similarity float64 `json:"similarity"`
+}
+
+// TriageTask detects duplicate tickets with similarity > 80% and same parent ticket (Requirement #1)
+func (h *TaskHandler) TriageTask(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error": "Method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Title        string `json:"title"`
+		Description  string `json:"desc"`
+		ParentTaskID *int   `json:"parent_task_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Title) == "" {
+		http.Error(w, `{"error": "Title is required for triage"}`, http.StatusBadRequest)
+		return
+	}
+
+	queryText := req.Title
+	if req.Description != "" {
+		queryText += " " + req.Description
+	}
+
+	vectorMatches, err := h.PythonClient.FetchSemanticMatchesWithDetails(queryText, 0.60)
+	if err != nil || len(vectorMatches) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"has_duplicates": false,
+			"matches":        []DuplicateMatch{},
+		})
+		return
+	}
+
+	var duplicateMatches []DuplicateMatch
+
+	for _, vm := range vectorMatches {
+		if vm.MaxScore < 0.60 {
+			continue
+		}
+
+		targetTask, err := h.getTaskByID(vm.TaskID)
+		if err != nil || targetTask == nil {
+			continue
+		}
+
+		// Condition: Check if same parent ticket (or both tickets have NO parent ticket)
+		reqHasNoParent := req.ParentTaskID == nil || *req.ParentTaskID == 0
+		targetHasNoParent := targetTask.ParentTaskID == nil || *targetTask.ParentTaskID == 0
+
+		sameParent := false
+		if reqHasNoParent && targetHasNoParent {
+			sameParent = true
+		} else if !reqHasNoParent && !targetHasNoParent && *req.ParentTaskID == *targetTask.ParentTaskID {
+			sameParent = true
+		}
+
+		if sameParent {
+			duplicateMatches = append(duplicateMatches, DuplicateMatch{
+				Task:       *targetTask,
+				Similarity: vm.MaxScore,
+			})
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"has_duplicates": len(duplicateMatches) > 0,
+		"matches":        duplicateMatches,
+	})
+}

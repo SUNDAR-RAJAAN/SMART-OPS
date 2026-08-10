@@ -6,6 +6,8 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import chromadb
+# pyrefly: ignore [missing-import]
+from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 
 # Configure logging format to clearly show AI microservice events
@@ -39,9 +41,20 @@ load_env_file()
 
 app = FastAPI(title="SmartOps AI & Vector Search Microservice")
 
-# Initialize ChromaDB Vector Database
-chroma_client = chromadb.Client()
-collection = chroma_client.get_or_create_collection(name="smartops_tasks")
+# Initialize SentenceTransformer embedding model (BAAI/bge-small-en-v1.5)
+logger.info("⏳ Loading BAAI/bge-small-en-v1.5 SentenceTransformer embedding model...")
+embedding_model = SentenceTransformer("BAAI/bge-small-en-v1.5")
+logger.info("✅ BAAI/bge-small-en-v1.5 model loaded successfully!")
+
+# Initialize ChromaDB Vector Database using Cosine distance space
+chroma_client = chromadb.PersistentClient(path="./chroma_db")
+collection = chroma_client.get_or_create_collection(
+    name="smartops_tasks",
+    metadata={"hnsw:space": "cosine"}
+)
+
+# Similarity threshold default (can be configured via environment variable)
+SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.60"))
 
 # Environment Variables & LLM API Client Setup
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", os.getenv("OPENAI_API_KEY", "")).strip()
@@ -52,7 +65,6 @@ llm_client = None
 
 if NVIDIA_API_KEY and NVIDIA_API_KEY != "<api-key>":
     try:
-        # Match test.py OpenAI client initialization exactly
         llm_client = OpenAI(
             base_url=NVIDIA_BASE_URL,
             api_key=NVIDIA_API_KEY,
@@ -87,6 +99,8 @@ def health_check():
     return {
         "status": "online",
         "service": "SmartOps AI & ChromaDB Microservice",
+        "embedding_model": "BAAI/bge-small-en-v1.5",
+        "similarity_threshold": SIMILARITY_THRESHOLD,
         "model": NVIDIA_MODEL,
         "llm_client_active": llm_client is not None,
         "api_key_configured": bool(NVIDIA_API_KEY and NVIDIA_API_KEY != "<api-key>")
@@ -96,16 +110,36 @@ def health_check():
 @app.post("/api/vector/index")
 @app.post("/internal/ai/index")
 def index_task(req: TaskIndexRequest):
-    """Upsert task title & description into ChromaDB vector engine."""
+    """Embed title and description separately using BAAI/bge-small-en-v1.5 and upsert into ChromaDB."""
     try:
-        text_content = f"{req.title}. {req.description or ''}"
+        ids = []
+        embeddings = []
+        documents = []
+        metadatas = []
+
+        # 1. Title Embedding
+        title_emb = embedding_model.encode(req.title, normalize_embeddings=True).tolist()
+        ids.append(f"{req.task_id}_title")
+        embeddings.append(title_emb)
+        documents.append(req.title)
+        metadatas.append({"task_id": req.task_id, "field": "title", "title": req.title})
+
+        # 2. Description Embedding (if present and non-empty)
+        if req.description and req.description.strip():
+            desc_emb = embedding_model.encode(req.description, normalize_embeddings=True).tolist()
+            ids.append(f"{req.task_id}_desc")
+            embeddings.append(desc_emb)
+            documents.append(req.description)
+            metadatas.append({"task_id": req.task_id, "field": "description", "title": req.title})
+
         collection.upsert(
-            documents=[text_content],
-            metadatas=[{"title": req.title}],
-            ids=[str(req.task_id)]
+            ids=ids,
+            embeddings=embeddings,
+            documents=documents,
+            metadatas=metadatas
         )
-        logger.info(f"📌 [CHROMADB INDEX] Task #{req.task_id} ('{req.title}') indexed successfully.")
-        return {"status": "success", "task_id": req.task_id}
+        logger.info(f"📌 [CHROMADB BGE INDEX] Task #{req.task_id} ('{req.title}') title and description embedded & indexed separately.")
+        return {"status": "success", "task_id": req.task_id, "entries_indexed": len(ids)}
     except Exception as e:
         logger.error(f"❌ [CHROMADB INDEX ERROR] Task #{req.task_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -113,30 +147,76 @@ def index_task(req: TaskIndexRequest):
 
 @app.get("/api/vector/search")
 @app.post("/internal/ai/search")
-def search_vector(q: Optional[str] = ""):
-    """Semantic Vector Search querying ChromaDB top nearest neighbors."""
-    if not q:
-        return {"task_ids": []}
+def search_vector(q: Optional[str] = "", threshold: Optional[float] = None):
+    """Semantic Vector Search querying BGE embeddings, deduplicating max(title, desc) score, and filtering by similarity threshold."""
+    if not q or not q.strip():
+        return {"task_ids": [], "results": []}
+
+    target_threshold = threshold if threshold is not None else SIMILARITY_THRESHOLD
 
     try:
-        results = collection.query(
-            query_texts=[q],
-            n_results=5
-        )
+        query_emb = embedding_model.encode(q, normalize_embeddings=True).tolist()
         
-        task_ids = []
-        if results and "ids" in results and len(results["ids"]) > 0:
-            for str_id in results["ids"][0]:
-                try:
-                    task_ids.append(int(str_id))
-                except ValueError:
-                    pass
+        query_res = collection.query(
+            query_embeddings=[query_emb],
+            n_results=20,
+            include=["metadatas", "distances", "documents"]
+        )
 
-        logger.info(f"🔍 [VECTOR SEARCH] Query: '{q}' -> Matched Task IDs: {task_ids}")
-        return {"task_ids": task_ids}
+        task_scores = {}
+        task_details = {}
+
+        if query_res and "ids" in query_res and len(query_res["ids"]) > 0:
+            doc_ids = query_res["ids"][0]
+            distances = query_res["distances"][0] if "distances" in query_res and query_res["distances"] else [0.0]*len(doc_ids)
+            metadatas = query_res["metadatas"][0] if "metadatas" in query_res and query_res["metadatas"] else [{}]*len(doc_ids)
+
+            for doc_id, dist, meta in zip(doc_ids, distances, metadatas):
+                task_id = meta.get("task_id")
+                if task_id is None:
+                    try:
+                        task_id = int(str(doc_id).split("_")[0])
+                    except (ValueError, IndexError):
+                        continue
+                else:
+                    task_id = int(task_id)
+
+                field = meta.get("field", "title")
+                # Cosine distance space in ChromaDB: cosine_similarity = 1.0 - distance
+                sim_score = round(1.0 - float(dist), 4)
+
+                if task_id not in task_scores:
+                    task_scores[task_id] = sim_score
+                    task_details[task_id] = {
+                        "task_id": task_id,
+                        "title": meta.get("title", ""),
+                        "max_score": sim_score,
+                        f"{field}_score": sim_score
+                    }
+                else:
+                    # Deduplication logic: max(title emb score, desc emb score)
+                    prev_max = task_scores[task_id]
+                    new_max = max(prev_max, sim_score)
+                    task_scores[task_id] = new_max
+                    task_details[task_id]["max_score"] = new_max
+                    task_details[task_id][f"{field}_score"] = sim_score
+
+        # Filter by similarity threshold
+        filtered_items = [
+            info for task_id, info in task_details.items()
+            if info["max_score"] >= target_threshold
+        ]
+
+        # Sort by max_score descending
+        filtered_items.sort(key=lambda x: x["max_score"], reverse=True)
+
+        task_ids = [item["task_id"] for item in filtered_items]
+
+        logger.info(f"🔍 [BGE VECTOR SEARCH] Query: '{q}' (threshold={target_threshold}) -> Matched Task IDs: {task_ids}")
+        return {"task_ids": task_ids, "results": filtered_items}
     except Exception as e:
         logger.error(f"❌ [VECTOR SEARCH ERROR] Query '{q}': {e}")
-        return {"task_ids": []}
+        return {"task_ids": [], "results": []}
 
 
 @app.post("/api/tasks/breakdown", response_model=List[SubTaskSuggestion])
@@ -145,7 +225,7 @@ def agentic_breakdown(req: BreakdownRequest):
     """Decompose large feature task into technical sub-tasks matching test.py OpenAI client call pattern."""
     logger.info(f"🤖 [BREAKDOWN REQUEST RECEIVED] Task #{req.parent_task_id}: Title='{req.title}' | Desc='{req.description}'")
 
-    prompt = f"""You are an expert AI software architect. Break down the following high-level software task into 3 distinct, actionable technical sub-tasks.
+    prompt = f"""You are an expert AI software architect. Break down the following high-level software task into N distinct, actionable technical sub-tasks.
 Task Title: {req.title}
 Task Description: {req.description or 'No extra description.'}
 
@@ -163,7 +243,6 @@ Do not include any Markdown text or explanation outside the JSON array.
         try:
             logger.info(f"⚡ [LLM CALL INITIATING] Dispatching request matching test.py pattern (Model: {NVIDIA_MODEL})...")
             
-            # Match test.py completion call parameters exactly
             response = llm_client.chat.completions.create(
                 model=NVIDIA_MODEL,
                 messages=[

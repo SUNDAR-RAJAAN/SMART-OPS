@@ -52,12 +52,14 @@ func main() {
 	// 1. IAM Endpoints
 	mux.HandleFunc("/auth/login", iamHandler.Login)
 	mux.Handle("/users/me", authMiddleware(http.HandlerFunc(iamHandler.GetProfile)))
+	mux.Handle("/users/settings", authMiddleware(http.HandlerFunc(iamHandler.UpdateSettings)))
 
 	// 2. Gateway Search Endpoint
 	mux.Handle("/search", authMiddleware(http.HandlerFunc(gatewayHandler.Search)))
 
 	// 3. Centralized Notification & WebSocket Engine
 	mux.Handle("/notifications/unread", authMiddleware(http.HandlerFunc(notificationHandler.GetUnread)))
+	mux.Handle("/notifications/test-teams-webhook", authMiddleware(http.HandlerFunc(notificationHandler.TestTeamsWebhook)))
 	mux.HandleFunc("/ws/notifications", notificationHandler.HandleWebSocket)
 
 	// Router for /notifications/{id}/read
@@ -114,6 +116,10 @@ func main() {
 		}
 
 		if r.Method == http.MethodPost {
+			if strings.HasSuffix(path, "/triage") {
+				authMiddleware(http.HandlerFunc(taskHandler.TriageTask)).ServeHTTP(w, r)
+				return
+			}
 			if strings.HasSuffix(path, "/attachments") {
 				authMiddleware(http.HandlerFunc(taskHandler.UploadAttachment)).ServeHTTP(w, r)
 				return

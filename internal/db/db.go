@@ -114,6 +114,7 @@ func (d *DB) createTables() error {
 			email TEXT UNIQUE NOT NULL,
 			role TEXT NOT NULL,
 			team_id INTEGER DEFAULT 1,
+			teams_webhook_url TEXT DEFAULT '',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 
@@ -159,7 +160,13 @@ func (d *DB) createTables() error {
 	}
 
 	_, err := d.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Auto-migrate: ensure teams_webhook_url column exists on existing DB instances
+	_, _ = d.Exec("ALTER TABLE users ADD COLUMN teams_webhook_url TEXT DEFAULT ''")
+	return nil
 }
 
 func (d *DB) seedInitialData() error {

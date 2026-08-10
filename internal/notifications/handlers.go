@@ -1,7 +1,9 @@
 package notifications
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,6 +20,9 @@ type NotificationHandler struct {
 }
 
 func NewNotificationHandler(database *db.DB, hub *NotificationHub, jwtSecret string) *NotificationHandler {
+	if hub != nil && database != nil {
+		hub.SetDB(database)
+	}
 	return &NotificationHandler{
 		DB:        database,
 		Hub:       hub,
@@ -171,4 +176,61 @@ func (s *sqlNullString) Scan(value interface{}) error {
 		s.String = string(v)
 	}
 	return nil
+}
+
+// TestTeamsWebhook sends a sample test payload {"text": "..."} to user's Teams webhook URL
+func (h *NotificationHandler) TestTeamsWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error": "Method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	_, ok := middleware.UserFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error": "Unauthorized context"}`, http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		WebhookURL string `json:"webhook_url"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.WebhookURL) == "" {
+		http.Error(w, `{"error": "Webhook URL is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	targetURL := strings.TrimSpace(req.WebhookURL)
+	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
+		http.Error(w, `{"error": "Invalid Webhook URL protocol (must start with http:// or https://)"}`, http.StatusBadRequest)
+		return
+	}
+
+	payload := map[string]string{
+		"text": "⚡ Test notification from SmartOps: Microsoft Teams integration connected successfully!",
+	}
+	jsonBytes, err := json.Marshal(payload)
+	if err != nil {
+		http.Error(w, `{"error": "Failed marshaling JSON payload"}`, http.StatusInternalServerError)
+		return
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(targetURL, "application/json", bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error": "Failed connecting to Teams Webhook URL: %v"}`, err), http.StatusBadRequest)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		http.Error(w, fmt.Sprintf(`{"error": "Teams Webhook returned HTTP error status %d"}`, resp.StatusCode), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "success",
+		"message": "Sample test message sent to Microsoft Teams successfully!",
+	})
 }

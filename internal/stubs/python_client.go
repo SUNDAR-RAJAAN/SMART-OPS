@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -24,7 +25,7 @@ func NewPythonClient(baseURL string) *PythonClient {
 	return &PythonClient{
 		BaseURL: baseURL,
 		HTTPClient: &http.Client{
-			Timeout: 300 * time.Second,
+			Timeout: 120 * time.Second,
 		},
 	}
 }
@@ -33,44 +34,41 @@ func NewPythonClient(baseURL string) *PythonClient {
 // TODO: Hook up outbox pattern or Kafka/RabbitMQ queue worker for production vector DB sync.
 func (c *PythonClient) SyncTaskToVectorDB(taskID int, title, description string) {
 	go func() {
-		log.Printf("[TODO: Python Client] Asynchronously syncing task #%d to ChromaDB vector engine...", taskID)
-
 		payload := map[string]interface{}{
 			"task_id":     taskID,
 			"title":       title,
 			"description": description,
 		}
+		jsonBytes, _ := json.Marshal(payload)
 
-		body, err := json.Marshal(payload)
-		if err != nil {
-			log.Printf("[TODO: Python Client] Failed to marshal vector sync payload: %v", err)
-			return
-		}
-
-		resp, err := c.HTTPClient.Post(fmt.Sprintf("%s/api/vector/index", c.BaseURL), "application/json", bytes.NewBuffer(body))
+		targetURL := fmt.Sprintf("%s/api/vector/index", c.BaseURL)
+		resp, err := c.HTTPClient.Post(targetURL, "application/json", bytes.NewBuffer(jsonBytes))
 		if err != nil {
 			log.Printf("[TODO: Python Client] Vector sync call skipped (Python service offline at %s): %v", c.BaseURL, err)
 			return
 		}
 		defer resp.Body.Close()
 
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
-			log.Printf("[Python Client] Task #%d successfully indexed into ChromaDB", taskID)
-		} else {
-			log.Printf("[Python Client] ChromaDB index endpoint returned status: %d", resp.StatusCode)
+		if resp.StatusCode == http.StatusOK {
+			log.Printf("[Python Client] Task #%d successfully indexed into ChromaDB vector engine", taskID)
 		}
 	}()
 }
 
-// FetchSemanticMatches calls the Python service for top vector search matches.
-// TODO: Connect to Python ChromaDB semantic query endpoint. Returns vector match IDs.
-func (c *PythonClient) FetchSemanticMatches(query string) ([]int, error) {
-	log.Printf("[TODO: Python Client] Querying ChromaDB semantic vector index for: '%s'", query)
+type VectorMatchDetail struct {
+	TaskID   int     `json:"task_id"`
+	Title    string  `json:"title"`
+	MaxScore float64 `json:"max_score"`
+}
 
-	url := fmt.Sprintf("%s/api/vector/search?q=%s", c.BaseURL, query)
-	resp, err := c.HTTPClient.Get(url)
+// FetchSemanticMatches calls the Python service for top vector search matches.
+func (c *PythonClient) FetchSemanticMatches(query string) ([]int, error) {
+	log.Printf("[Python Client] Querying ChromaDB semantic vector index for: '%s'", query)
+
+	searchURL := fmt.Sprintf("%s/api/vector/search?q=%s", c.BaseURL, url.QueryEscape(query))
+	resp, err := c.HTTPClient.Get(searchURL)
 	if err != nil {
-		log.Printf("[TODO: Python Client] Python service offline (%s). Using empty vector search fallback.", c.BaseURL)
+		log.Printf("[Python Client] Python service offline (%s). Using empty vector search fallback.", c.BaseURL)
 		return []int{}, nil
 	}
 	defer resp.Body.Close()
@@ -84,6 +82,30 @@ func (c *PythonClient) FetchSemanticMatches(query string) ([]int, error) {
 	}
 
 	return result.TaskIDs, nil
+}
+
+// FetchSemanticMatchesWithDetails queries Python AI service with a specific threshold and returns detailed match scores.
+func (c *PythonClient) FetchSemanticMatchesWithDetails(query string, threshold float64) ([]VectorMatchDetail, error) {
+	log.Printf("[Python Client] 🔍 Triage query for '%s' with threshold %.2f", query, threshold)
+
+	searchURL := fmt.Sprintf("%s/api/vector/search?q=%s&threshold=%.2f", c.BaseURL, url.QueryEscape(query), threshold)
+	resp, err := c.HTTPClient.Get(searchURL)
+	if err != nil {
+		log.Printf("[Python Client] Python service offline for triage query: %v", err)
+		return []VectorMatchDetail{}, nil
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		TaskIDs []int               `json:"task_ids"`
+		Results []VectorMatchDetail `json:"results"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return []VectorMatchDetail{}, nil
+	}
+
+	return result.Results, nil
 }
 
 // GenerateSubTasks forwards a task description to Python/LangChain service for agentic task breakdown.

@@ -62,6 +62,13 @@ export const api = {
     }, token);
   },
 
+  triageTask: async (taskData, token) => {
+    return request('/tasks/triage', {
+      method: 'POST',
+      body: JSON.stringify(taskData),
+    }, token);
+  },
+
   updateTask: async (taskId, taskData, token) => {
     return request(`/tasks/${taskId}`, {
       method: 'PUT',
@@ -131,5 +138,19 @@ export const api = {
 
   getOverdueTasks: async (token) => {
     return request('/analytics/overdue', { method: 'GET' }, token);
+  },
+
+  updateUserSettings: async (settings, token) => {
+    return request('/users/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }, token);
+  },
+
+  testTeamsWebhook: async (webhookUrl, token) => {
+    return request('/notifications/test-teams-webhook', {
+      method: 'POST',
+      body: JSON.stringify({ webhook_url: webhookUrl }),
+    }, token);
   },
 };
