@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import { Sparkles, Paperclip, X, FileText, Loader2, MessageSquare, Send, AtSign, Trash2, Edit3, Check, UserCheck } from 'lucide-react';
@@ -23,6 +23,8 @@ export default function TaskDetailModal({ task, onClose, onTaskUpdated }) {
   const [showMentionMenu, setShowMentionMenu] = useState(false);
 
   const [breakingDown, setBreakingDown] = useState(false);
+  const [breakdownStep, setBreakdownStep] = useState(0);
+  const breakdownSectionRef = useRef(null);
   const [confirmingSubTasks, setConfirmingSubTasks] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -136,14 +138,27 @@ export default function TaskDetailModal({ task, onClose, onTaskUpdated }) {
   // --- Issue #1: Agentic Breakdown Draft Cards & Confirmation Flow ---
   const handleAgenticBreakdown = async () => {
     setBreakingDown(true);
+    setBreakdownStep(1);
+
+    // Scroll smoothly to breakdown section
+    setTimeout(() => {
+      breakdownSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+
+    // Natural step progression timer while backend LLM processes
+    const stepInterval = setInterval(() => {
+      setBreakdownStep((prev) => (prev < 3 ? prev + 1 : prev));
+    }, 2500);
+
     try {
       const suggestions = await api.agenticBreakdown(currentTask.id, token);
-      // Load temporary draft cards into local state
       setDraftSubTasks(suggestions || []);
     } catch (err) {
       alert(`Agentic breakdown failed: ${err.message}`);
     } finally {
+      clearInterval(stepInterval);
       setBreakingDown(false);
+      setBreakdownStep(0);
     }
   };
 
@@ -400,6 +415,48 @@ export default function TaskDetailModal({ task, onClose, onTaskUpdated }) {
                   {att.file_url.split('/').pop()}
                 </a>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Animated AI Agentic Processing Card */}
+        {breakingDown && (
+          <div 
+            ref={breakdownSectionRef}
+            className="pulse-glow"
+            style={{ 
+              marginBottom: '24px', 
+              background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.14) 0%, rgba(59, 130, 246, 0.08) 100%)', 
+              border: '1px solid rgba(139, 92, 246, 0.5)', 
+              padding: '20px', 
+              borderRadius: 'var(--radius-md)' 
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Loader2 size={22} className="spin" style={{ color: 'var(--accent-sparkle)' }} />
+                <div>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                    Agentic AI Task Breakdown in Progress...
+                  </h4>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--accent-sparkle)', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Sparkles size={14} className="spin" />
+                    {breakdownStep <= 1 && "⚡ Connecting to AI LLM Engine & Dispatching Prompt..."}
+                    {breakdownStep === 2 && "🧠 Analyzing task context, architecture dependencies & effort..."}
+                    {breakdownStep >= 3 && "📋 Synthesizing technical sub-task draft cards..."}
+                  </p>
+                </div>
+              </div>
+              <span className="badge badge-exact" style={{ fontSize: '0.75rem', background: 'rgba(124, 58, 237, 0.25)', border: '1px solid rgba(139, 92, 246, 0.4)' }}>
+                LLM Active
+              </span>
+            </div>
+
+            {/* Shimmer Skeleton Cards */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div className="skeleton-shimmer" style={{ height: '64px' }} />
+              <div className="skeleton-shimmer" style={{ height: '64px', opacity: 0.8 }} />
+              <div className="skeleton-shimmer" style={{ height: '64px', opacity: 0.6 }} />
             </div>
           </div>
         )}
