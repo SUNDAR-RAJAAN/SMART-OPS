@@ -1,10 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
-import { Command, Plus, X, AlertTriangle, ExternalLink, ShieldAlert, Sparkles } from 'lucide-react';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import { 
+  CloseRounded, 
+  AutoAwesomeRounded, 
+  WarningAmberRounded, 
+  AddRounded
+} from '@mui/icons-material';
 
 export default function CommandPalette({ isOpen, onClose, onTaskCreated, onSelectTaskID }) {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
@@ -17,7 +35,6 @@ export default function CommandPalette({ isOpen, onClose, onTaskCreated, onSelec
   const [duplicateMatches, setDuplicateMatches] = useState([]);
   const [bypassDuplicate, setBypassDuplicate] = useState(false);
 
-  const inputRef = useRef(null);
   const triageTimeoutRef = useRef(null);
 
   const usersList = [
@@ -27,9 +44,7 @@ export default function CommandPalette({ isOpen, onClose, onTaskCreated, onSelec
   ];
 
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
+    if (!isOpen) {
       setTitle('');
       setDescription('');
       setAssigneeId('');
@@ -62,43 +77,37 @@ export default function CommandPalette({ isOpen, onClose, onTaskCreated, onSelec
           setDuplicateMatches([]);
         }
       } catch (err) {
-        console.error('Triage check error:', err);
+        setDuplicateMatches([]);
       } finally {
         setTriageLoading(false);
       }
     }, 400);
 
-    return () => clearTimeout(triageTimeoutRef.current);
-  }, [title, description, parentTaskId, token, bypassDuplicate]);
+    return () => {
+      if (triageTimeoutRef.current) clearTimeout(triageTimeoutRef.current);
+    };
+  }, [title, description, parentTaskId, bypassDuplicate, token]);
 
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e, forceCreate = false) => {
-    if (e) e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!title.trim()) return;
 
-    if (!forceCreate && duplicateMatches.length > 0 && !bypassDuplicate) {
-      return; // Stop submission if duplicates found and user hasn't chosen force create
+    if (duplicateMatches.length > 0 && !bypassDuplicate) {
+      return;
     }
 
     setSubmitting(true);
     try {
-      const newTask = await api.createTask({
+      const payload = {
         title: title.trim(),
         desc: description.trim(),
-        priority,
         status: 'todo',
+        priority,
         assignee_id: assigneeId ? parseInt(assigneeId) : null,
-        reporter_id: user?.id || 1,
         parent_task_id: parentTaskId ? parseInt(parentTaskId) : null,
-      }, token);
+      };
 
-      setTitle('');
-      setDescription('');
-      setAssigneeId('');
-      setParentTaskId('');
-      setDuplicateMatches([]);
-      setBypassDuplicate(false);
+      const newTask = await api.createTask(payload, token);
       onTaskCreated?.(newTask);
       onClose();
     } catch (err) {
@@ -108,169 +117,216 @@ export default function CommandPalette({ isOpen, onClose, onTaskCreated, onSelec
     }
   };
 
-  const handleLinkToTask = (taskId) => {
-    onClose();
-    if (onSelectTaskID) {
-      onSelectTaskID(taskId);
-    }
-  };
-
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div 
-        className="card" 
-        style={{ width: '100%', maxWidth: '580px', background: 'var(--bg-card)', padding: '24px', boxShadow: 'var(--shadow-modal)', maxHeight: '90vh', overflowY: 'auto' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontWeight: 600 }}>
-            <Command size={18} style={{ color: 'var(--accent-primary)' }} />
-            <span>Create Task (Cmd+K)</span>
-          </div>
-          <button onClick={onClose} style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
-        </div>
-
-        {/* Smart Triage & Duplicate Detection Banner (>80% similarity & same parent) */}
-        {duplicateMatches.length > 0 && !bypassDuplicate && (
-          <div 
-            style={{ 
-              marginBottom: '16px', 
-              background: 'rgba(239, 68, 68, 0.12)', 
-              border: '1px solid rgba(239, 68, 68, 0.4)', 
-              padding: '14px', 
-              borderRadius: 'var(--radius-md)' 
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      PaperProps={{
+        sx: {
+          borderRadius: 3.5,
+          p: 1,
+        },
+      }}
+    >
+      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+          <Box
+            sx={{
+              p: 0.8,
+              borderRadius: '10px',
+              bgcolor: 'rgba(99, 102, 241, 0.2)',
+              color: '#818CF8',
+              display: 'flex',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fca5a5', fontWeight: 600, fontSize: '0.88rem', marginBottom: '8px' }}>
-              <ShieldAlert size={18} />
-              <span>Smart Triage: Duplicate Issue Detected (&gt;60% similarity)</span>
-            </div>
+            <AutoAwesomeRounded fontSize="small" />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: '#F8FAFC' }}>
+            Fast Command Creation
+          </Typography>
+        </Box>
 
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-              A highly similar task already exists under the same parent ticket. Linking prevents board clutter:
-            </p>
+        <IconButton size="small" onClick={onClose} sx={{ color: '#94A3B8' }}>
+          <CloseRounded />
+        </IconButton>
+      </DialogTitle>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+      <DialogContent sx={{ pt: 2 }}>
+        
+        {/* Live Duplicate Alert */}
+        {duplicateMatches.length > 0 && !bypassDuplicate && (
+          <Alert
+            severity="warning"
+            icon={<WarningAmberRounded />}
+            sx={{
+              mb: 2.5,
+              borderRadius: '12px',
+              bgcolor: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              color: '#FBBF24',
+              '& .MuiAlert-icon': { color: '#F59E0B' },
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#F8FAFC', mb: 0.5 }}>
+              Potential Duplicate Task Detected!
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#FDE68A', fontSize: '0.82rem', mb: 1.5 }}>
+              ChromaDB semantic search found {duplicateMatches.length} matching ticket(s) with high similarity.
+            </Typography>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1.5 }}>
               {duplicateMatches.map((match) => (
-                <div 
-                  key={match.id} 
-                  style={{ 
-                    background: 'var(--bg-input)', 
-                    padding: '10px 12px', 
-                    borderRadius: 'var(--radius-sm)', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between' 
+                <Box
+                  key={match.id}
+                  onClick={() => onSelectTaskID?.(match.id)}
+                  sx={{
+                    p: 1.2,
+                    borderRadius: '8px',
+                    bgcolor: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    '&:hover': { bgcolor: 'rgba(245, 158, 11, 0.15)' },
                   }}
                 >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>#{match.id} - {match.title}</span>
-                      <span className="badge badge-exact" style={{ fontSize: '0.7rem' }}>
-                        {Math.round((match.similarity || 0.6) * 100)}% Match
-                      </span>
-                    </div>
-                    {match.desc && <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>{match.desc}</p>}
-                  </div>
-
-                  <button 
-                    type="button" 
-                    className="btn-secondary" 
-                    style={{ fontSize: '0.78rem', padding: '4px 10px' }}
-                    onClick={() => handleLinkToTask(match.id)}
-                  >
-                    <ExternalLink size={14} /> Link Task
-                  </button>
-                </div>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#F8FAFC' }}>
+                    #{match.id} - {match.title}
+                  </Typography>
+                  <Chip
+                    label={`${(match.similarity * 100).toFixed(0)}% match`}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(245, 158, 11, 0.25)', color: '#FBBF24', fontWeight: 700, fontSize: '0.7rem' }}
+                  />
+                </Box>
               ))}
-            </div>
+            </Box>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button 
-                type="button" 
-                className="btn-danger" 
-                style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-                onClick={() => setBypassDuplicate(true)}
-              >
-                Create Task Anyway
-              </button>
-            </div>
-          </div>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setBypassDuplicate(true)}
+              sx={{
+                borderColor: '#F59E0B',
+                color: '#FBBF24',
+                fontSize: '0.75rem',
+                '&:hover': { bgcolor: 'rgba(245, 158, 11, 0.2)' },
+              }}
+            >
+              Ignore & Create Anyway
+            </Button>
+          </Alert>
         )}
 
-        <form onSubmit={(e) => handleSubmit(e, false)}>
-          <div style={{ marginBottom: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Task Title</label>
-              {triageLoading && (
-                <span style={{ fontSize: '0.75rem', color: 'var(--accent-sparkle)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Sparkles size={12} /> Checking AI Triage...
-                </span>
-              )}
-            </div>
-            <input
-              ref={inputRef}
-              type="text"
-              className="input-field"
-              placeholder="Task title (e.g. Auth token validation handler)..."
+        <form onSubmit={handleSubmit}>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#94A3B8', display: 'block', mb: 0.5 }}>
+              TASK TITLE *
+            </Typography>
+            <TextField
+              fullWidth
+              autoFocus
+              placeholder="e.g. Implement OAuth2 Refresh Token Rotation"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
+              size="small"
             />
-          </div>
+            {triageLoading && (
+              <Typography variant="caption" sx={{ color: '#6366F1', display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                <CircularProgress size={12} color="inherit" /> Checking vector database for duplicate tickets...
+              </Typography>
+            )}
+          </Box>
 
-          <div style={{ marginBottom: '14px' }}>
-            <textarea
-              className="input-field"
-              placeholder="Add task description or context (optional)..."
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#94A3B8', display: 'block', mb: 0.5 }}>
+              DESCRIPTION
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
               rows={3}
+              placeholder="Technical specs, expected behavior, or acceptance criteria..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              size="small"
             />
-          </div>
+          </Box>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-            <div>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Priority</span>
-              <select
-                className="input-field"
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#94A3B8', display: 'block', mb: 0.5 }}>
+                PRIORITY
+              </Typography>
+              <Select
+                fullWidth
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
+                size="small"
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </div>
+                <MenuItem value="low">Low Priority</MenuItem>
+                <MenuItem value="medium">Medium Priority</MenuItem>
+                <MenuItem value="high">High Priority</MenuItem>
+              </Select>
+            </Box>
 
-            <div>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Assignee</span>
-              <select
-                className="input-field"
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#94A3B8', display: 'block', mb: 0.5 }}>
+                ASSIGNEE
+              </Typography>
+              <Select
+                fullWidth
                 value={assigneeId}
                 onChange={(e) => setAssigneeId(e.target.value)}
+                size="small"
+                displayEmpty
               >
-                <option value="">Unassigned</option>
+                <MenuItem value="">Unassigned</MenuItem>
                 {usersList.map((u) => (
-                  <option key={u.id} value={u.id}>{u.email}</option>
+                  <MenuItem key={u.id} value={u.id}>
+                    {u.email} ({u.role})
+                  </MenuItem>
                 ))}
-              </select>
-            </div>
-          </div>
+              </Select>
+            </Box>
+          </Box>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button 
-              type="submit" 
-              className="btn-primary" 
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: '#94A3B8', display: 'block', mb: 0.5 }}>
+              PARENT TASK ID (OPTIONAL)
+            </Typography>
+            <TextField
+              fullWidth
+              type="number"
+              placeholder="Leave empty if top-level task"
+              value={parentTaskId}
+              onChange={(e) => setParentTaskId(e.target.value)}
+              size="small"
+            />
+          </Box>
+
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button variant="outlined" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
               disabled={submitting || (duplicateMatches.length > 0 && !bypassDuplicate)}
+              startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <AddRounded />}
+              sx={{ px: 3 }}
             >
-              <Plus size={16} />
               {submitting ? 'Creating...' : 'Create Task'}
-            </button>
-          </div>
+            </Button>
+          </Box>
         </form>
-      </div>
-    </div>
+
+      </DialogContent>
+    </Dialog>
   );
 }

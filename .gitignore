@@ -1,1 +1,91 @@
-plan/
+# =======================================================
+# AppGlide / SmartOps .gitignore
+# =======================================================
+
+# 1. Environment Variables & Secret API Keys (CRITICAL)
+.env
+.env.*
+!.env.example
+*.env
+
+# 2. Python & AI Microservice
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+chroma_db/
+ai_service/chroma_db/
+
+# 3. Node.js & React Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# 4. Go Backend & Executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+server.exe
+main.exe
+
+# 5. Local Databases & SQLite Locks
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+smartops.db
+smartops.db-wal
+smartops.db-shm
+
+# 6. Uploaded Files Storage
+uploads/*
+!uploads/.gitkeep
+
+# 7. OS & IDE System Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+git status

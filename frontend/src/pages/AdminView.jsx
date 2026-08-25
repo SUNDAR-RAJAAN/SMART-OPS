@@ -1,22 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../api/client';
-import { Shield, Users, Database, Server, CheckCircle, MessageSquare, Send, Save, AlertCircle, Sparkles } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Card from '@mui/material/Card';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
+import Avatar from '@mui/material/Avatar';
+import CircularProgress from '@mui/material/CircularProgress';
+import { 
+  ChatRounded, 
+  SendRounded, 
+  SaveRounded, 
+  StorageRounded, 
+  DnsRounded, 
+  TaskAltRounded, 
+  CheckCircleOutlineRounded, 
+  BoltRounded 
+} from '@mui/icons-material';
 
 export default function AdminView({ tasks }) {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
+  const { mode } = useThemeMode();
+  const isLight = mode === 'light';
+
   const [webhookUrl, setWebhookUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', message: '' });
 
   const seedUsers = [
-    { id: 1, email: 'admin@smartops.io', role: 'admin', team: 'Core Infrastructure' },
-    { id: 2, email: 'manager@smartops.io', role: 'manager', team: 'Product Management' },
-    { id: 3, email: 'dev@smartops.io', role: 'employee', team: 'Backend Engineering' },
+    { id: 1, email: 'admin@smartops.io', role: 'admin', team: 'Core Infrastructure', color: '#10B981' },
+    { id: 2, email: 'manager@smartops.io', role: 'manager', team: 'Product Management', color: '#F59E0B' },
+    { id: 3, email: 'dev@smartops.io', role: 'employee', team: 'Backend Engineering', color: '#8B5CF6' },
   ];
 
-  // Fetch current user settings
   useEffect(() => {
     if (!token) return;
     api.getProfile(token)
@@ -63,168 +84,231 @@ export default function AdminView({ tasks }) {
   };
 
   return (
-    <div style={{ padding: '24px 0' }}>
+    <Box sx={{ py: 1 }}>
       
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>Workspace Settings & System Control</h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>System metrics, RBAC permissions, and Microsoft Teams integration.</p>
-      </div>
+      <Box sx={{ mb: 3 }}>
+        <Typography 
+          variant="h4" 
+          sx={{ 
+            fontFamily: "'Outfit', sans-serif", 
+            fontWeight: 900, 
+            color: isLight ? '#0F172A' : '#FFFFFF', 
+            letterSpacing: '-0.03em',
+            mb: 0.5 
+          }}
+        >
+          Workspace Settings & System Control
+        </Typography>
+        <Typography variant="body2" sx={{ color: isLight ? '#64748B' : '#C4B5FD' }}>
+          System architecture metrics, RBAC permissions, and Microsoft Teams integration.
+        </Typography>
+      </Box>
 
       {/* Microsoft Teams Webhook Integration Card */}
-      <div 
-        className="card" 
-        style={{ 
-          padding: '24px', 
-          marginBottom: '28px', 
-          background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(79, 70, 229, 0.04) 100%)',
-          border: '1px solid rgba(59, 130, 246, 0.3)'
+      <Card
+        sx={{
+          p: 3.5,
+          mb: 3.5,
+          borderRadius: '18px',
+          background: isLight 
+            ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(236, 72, 153, 0.06) 100%)' 
+            : 'linear-gradient(135deg, rgba(139, 92, 246, 0.18) 0%, rgba(236, 72, 153, 0.1) 100%)',
+          border: isLight ? '1px solid rgba(139, 92, 246, 0.25)' : '1px solid rgba(168, 85, 247, 0.35)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ padding: '8px', borderRadius: 'var(--radius-sm)', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--accent-primary)' }}>
-              <MessageSquare size={22} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Microsoft Teams Channel Webhook</h2>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>Receive real-time channel notifications whenever task status changes, @mentions, or assignments occur.</p>
-            </div>
-          </div>
-          <span className="badge badge-fuzzy" style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Sparkles size={12} /> Real-Time Push
-          </span>
-        </div>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.8 }}>
+            <Box
+              sx={{
+                p: 1.2,
+                borderRadius: '12px',
+                bgcolor: isLight ? 'rgba(139, 92, 246, 0.15)' : 'rgba(168, 85, 247, 0.25)',
+                color: isLight ? '#7C3AED' : '#C084FC',
+                display: 'flex',
+              }}
+            >
+              <ChatRounded fontSize="medium" />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: isLight ? '#0F172A' : '#FFFFFF' }}>
+                Microsoft Teams Channel Webhook
+              </Typography>
+              <Typography variant="body2" sx={{ color: isLight ? '#64748B' : '#C4B5FD', fontSize: '0.82rem' }}>
+                Receive real-time channel notifications for task state transitions, @mentions, and assignments.
+              </Typography>
+            </Box>
+          </Box>
+
+          <Chip
+            icon={<BoltRounded sx={{ fontSize: 16 }} />}
+            label="Real-Time Push"
+            size="small"
+            color="primary"
+            sx={{ fontWeight: 800, fontFamily: "'Outfit', sans-serif" }}
+          />
+        </Box>
 
         {feedback.message && (
-          <div 
-            style={{ 
-              marginBottom: '16px', 
-              padding: '10px 14px', 
-              borderRadius: 'var(--radius-sm)', 
-              fontSize: '0.85rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: feedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-              border: feedback.type === 'success' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
-              color: feedback.type === 'success' ? '#6ee7b7' : '#fca5a5',
-            }}
-          >
-            {feedback.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-            <span>{feedback.message}</span>
-          </div>
+          <Alert severity={feedback.type === 'success' ? 'success' : 'error'} sx={{ mb: 2.5, borderRadius: '12px' }}>
+            {feedback.message}
+          </Alert>
         )}
 
         <form onSubmit={handleSaveSettings}>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-              Teams Webhook Connector URL
-            </label>
-            <input
+          <Box sx={{ mb: 2.5 }}>
+            <Typography variant="caption" sx={{ fontWeight: 800, color: isLight ? '#475569' : '#C4B5FD', display: 'block', mb: 0.8, letterSpacing: '0.04em' }}>
+              TEAMS WEBHOOK CONNECTOR URL
+            </Typography>
+            <TextField
+              fullWidth
               type="url"
-              className="input-field"
               placeholder="https://outlook.office.com/webhook/... or Azure Logic App URL"
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
-              style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.85rem' }}
+              size="small"
+              sx={{ fontFamily: 'monospace' }}
             />
-          </div>
+          </Box>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-            <button
+          <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end' }}>
+            <Button
               type="button"
-              className="btn-secondary"
+              variant="outlined"
               disabled={testing || !webhookUrl.trim()}
               onClick={handleTestWebhook}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+              startIcon={testing ? <CircularProgress size={16} color="inherit" /> : <SendRounded />}
+              sx={{ borderRadius: '12px' }}
             >
-              <Send size={15} />
               {testing ? 'Sending Sample...' : 'Test Teams Webhook'}
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="submit"
-              className="btn-primary"
+              variant="contained"
               disabled={saving}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+              startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveRounded />}
+              sx={{
+                borderRadius: '12px',
+                px: 2.5,
+                background: 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)',
+              }}
             >
-              <Save size={15} />
               {saving ? 'Saving...' : 'Save Settings'}
-            </button>
-          </div>
+            </Button>
+          </Box>
         </form>
-      </div>
+      </Card>
 
-      {/* System Metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
-        <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--accent-primary)', marginBottom: '8px' }}>
-            <Database size={20} />
-            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Database Driver</span>
-          </div>
-          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>SQLite3 (smartops.db)</span>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>Zero-config local relational storage mode</p>
-        </div>
+      {/* System Metrics Cards */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2.5, mb: 3.5 }}>
+        <Card sx={{ p: 2.8, borderRadius: '18px' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: '#8B5CF6', mb: 1 }}>
+            <StorageRounded />
+            <Typography variant="subtitle2" sx={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: isLight ? '#7C3AED' : '#C084FC' }}>
+              Database Engine
+            </Typography>
+          </Box>
+          <Typography variant="h6" sx={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: isLight ? '#0F172A' : '#FFFFFF' }}>
+            SQLite3 (smartops.db)
+          </Typography>
+          <Typography variant="caption" sx={{ color: isLight ? '#64748B' : '#94A3B8', display: 'block', mt: 0.5 }}>
+            Zero-config local relational storage mode
+          </Typography>
+        </Card>
 
-        <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#10b981', marginBottom: '8px' }}>
-            <Server size={20} />
-            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Backend Server</span>
-          </div>
-          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>Go 1.26 HTTP Engine</span>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>Listening on http://localhost:8080</p>
-        </div>
+        <Card sx={{ p: 2.8, borderRadius: '18px' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: '#06B6D4', mb: 1 }}>
+            <DnsRounded />
+            <Typography variant="subtitle2" sx={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: isLight ? '#0284C7' : '#22D3EE' }}>
+              Backend Server
+            </Typography>
+          </Box>
+          <Typography variant="h6" sx={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: isLight ? '#0F172A' : '#FFFFFF' }}>
+            Go 1.26 HTTP Server (:8080)
+          </Typography>
+          <Typography variant="caption" sx={{ color: isLight ? '#64748B' : '#94A3B8', display: 'block', mt: 0.5 }}>
+            High-performance concurrency with sub-1ms response
+          </Typography>
+        </Card>
 
-        <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#f59e0b', marginBottom: '8px' }}>
-            <Shield size={20} />
-            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Total Tasks Managed</span>
-          </div>
-          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{tasks.length} Active Records</span>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>Indexed in 3-tier search pipeline</p>
-        </div>
-      </div>
+        <Card sx={{ p: 2.8, borderRadius: '18px' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: '#10B981', mb: 1 }}>
+            <TaskAltRounded />
+            <Typography variant="subtitle2" sx={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: isLight ? '#059669' : '#34D399' }}>
+              Indexed Tasks
+            </Typography>
+          </Box>
+          <Typography variant="h6" sx={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: isLight ? '#0F172A' : '#FFFFFF' }}>
+            {tasks.length} Total Tasks
+          </Typography>
+          <Typography variant="caption" sx={{ color: isLight ? '#64748B' : '#94A3B8', display: 'block', mt: 0.5 }}>
+            Indexed for vector similarity triage & search
+          </Typography>
+        </Card>
+      </Box>
 
-      {/* User RBAC Directory */}
-      <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-          User & Role Assignments (RBAC)
-        </div>
+      {/* Role-Based Access Control (RBAC) User List */}
+      <Card sx={{ p: 3, borderRadius: '18px' }}>
+        <Typography variant="subtitle1" sx={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: isLight ? '#0F172A' : '#FFFFFF', mb: 2 }}>
+          Workspace Users & RBAC Directory
+        </Typography>
 
-        {seedUsers.map((u) => (
-          <div 
-            key={u.id}
-            style={{ 
-              padding: '14px 20px', 
-              borderBottom: '1px solid var(--border-color)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between' 
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
-                {u.email[0].toUpperCase()}
-              </div>
-              <div>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.92rem' }}>{u.email}</span>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Team: {u.team}</p>
-              </div>
-            </div>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {seedUsers.map((u) => (
+            <Box
+              key={u.id}
+              sx={{
+                p: 2,
+                borderRadius: '12px',
+                bgcolor: isLight ? 'rgba(248, 250, 252, 0.9)' : 'rgba(255, 255, 255, 0.03)',
+                border: isLight ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(255, 255, 255, 0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar sx={{ bgcolor: `${u.color}30`, color: u.color, fontWeight: 900 }}>
+                  {u.email[0].toUpperCase()}
+                </Avatar>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, color: isLight ? '#0F172A' : '#F8FAFC' }}>
+                    {u.email}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isLight ? '#64748B' : '#94A3B8' }}>
+                    {u.team}
+                  </Typography>
+                </Box>
+              </Box>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span className={`badge badge-${u.role === 'admin' ? 'done' : u.role === 'manager' ? 'code_review' : 'in_progress'}`}>
-                {u.role}
-              </span>
-              <span style={{ fontSize: '0.8rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CheckCircle size={14} /> Active
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Chip
+                  label={u.role}
+                  size="small"
+                  sx={{
+                    bgcolor: `${u.color}20`,
+                    color: u.color,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    fontFamily: "'Outfit', sans-serif",
+                    border: `1px solid ${u.color}40`,
+                  }}
+                />
+                <Chip
+                  icon={<CheckCircleOutlineRounded sx={{ fontSize: 14 }} />}
+                  label="Active"
+                  size="small"
+                  variant="outlined"
+                  color="success"
+                  sx={{ fontWeight: 700 }}
+                />
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      </Card>
 
-    </div>
+    </Box>
   );
 }

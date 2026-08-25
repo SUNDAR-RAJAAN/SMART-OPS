@@ -1,4 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import Box from '@mui/material/Box';
+import Container from '@mui/material/Container';
+import { ThemeModeProvider } from './context/ThemeModeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { api } from './api/client';
 import Navbar from './components/Navbar';
@@ -89,7 +94,7 @@ function MainApp() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-main)', color: 'var(--text-primary)' }}>
+    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -98,7 +103,7 @@ function MainApp() {
         onSelectTaskID={handleSelectTaskID}
       />
 
-      <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
+      <Container maxWidth="xl" sx={{ flex: 1, py: 3, px: { xs: 2, md: 3 } }}>
         {activeTab === 'my-tasks' && (
           <EmployeeView
             tasks={tasks}
@@ -124,7 +129,7 @@ function MainApp() {
         {activeTab === 'workspace-settings' && (
           <AdminView tasks={tasks} />
         )}
-      </main>
+      </Container>
 
       {/* Command Palette Modal */}
       <CommandPalette
@@ -146,14 +151,16 @@ function MainApp() {
         onClose={() => setSelectedTask(null)}
         onTaskUpdated={() => fetchTasks()}
       />
-    </div>
+    </Box>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
+    <ThemeModeProvider>
+      <AuthProvider>
+        <MainApp />
+      </AuthProvider>
+    </ThemeModeProvider>
   );
 }
