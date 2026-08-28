@@ -50,6 +50,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	// 1. IAM Endpoints
+mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK); w.Write([]byte("OK")) })
 	mux.HandleFunc("/auth/login", iamHandler.Login)
 	mux.Handle("/users/me", authMiddleware(http.HandlerFunc(iamHandler.GetProfile)))
 	mux.Handle("/users/settings", authMiddleware(http.HandlerFunc(iamHandler.UpdateSettings)))

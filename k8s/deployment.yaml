@@ -17,7 +17,7 @@ spec:
       containers:
       - name: smartops
         image: smartops:latest
-        imagePullPolicy: Never
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
 ---
