@@ -16,22 +16,22 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo "Building Docker image: ${APP_NAME}:${IMAGE_TAG}"
-                sh "docker build --no-cache -t ${APP_NAME}:${IMAGE_TAG} ."
-                sh "docker tag ${APP_NAME}:${IMAGE_TAG} ${APP_NAME}:latest"
+                sh "docker build --no-cache -t ${AAME_NAME}:${IMAGE_TAG} ."
+                sh "docker tag ${AAME_NAME}:${IMAGE_TAG} ${APP_NAME}:latest"
             }
         }
 
         stage('Load Image to Minikube') {
             steps {
                 echo "Loading image ${APP_NAME}:${IMAGE_TAG} into Minikube..."
-                sh "minikube image load ${APP_NAME}:${IMAGE_TAG}"
+                sh "minikube image load ${AAME_NAME}:${IMAGE_TAG}"
                 sh "minikube image load ${APP_NAME}:latest"
             }
         }
 
         stage('Update K8s Manifest') {
             steps {
-                echo "Updating k8s/deployment.yaml with tag ${IMAGE_TAG}"
+                echo "UpdatingZÎ3/deployment.yaml with tag ${IMAGE_TAG}"
                 sh """
                     sed -i 's|image: ${APP_NAME}:.*|image: ${APP_NAME}:${IMAGE_TAG}|g' k8s/deployment.yaml
                 """
