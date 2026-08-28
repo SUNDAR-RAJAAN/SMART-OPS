@@ -12,7 +12,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o smartops-server ./cmd/server
+RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -o smartops-server ./cmd/server
 
 # Final runtime image
 FROM alpine:3.19
