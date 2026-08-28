@@ -16,8 +16,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo "Building Docker image: ${APP_NAME}:${IMAGE_TAG}"
-                sh "docker build --no-cache -t ${AT_NAME}:${IMAGE_TAG} ."
-                sh "docker tag ${APP_NAME}:${IMAGE_TAG} ${AT_NAME}:latest"
+                sh "docker build --no-cache -t ${APP_NAME}:${IMAGE_TAG} ."
+                sh "docker tag ${APP_NAME}:${IMAGE_TAG} ${APP_NAME}:latest"
             }
         }
 
@@ -32,7 +32,7 @@ pipeline {
         stage('Update K8s Manifest') {
             steps {
                 echo "Updating k8s/deployment.yaml with tag ${IMAGE_TAG}"
-                sh "sed -i 's|image: ${AT_NAME}:.*|image: ${APP_NAME}:${IMAGE_TAG}|g' k8s/deployment.yaml"
+                sh "sed -i 's|image: ${APP_NAME}:.*|image: ${APP_NAME}:${IMAGE_TAG}|g' k8s/deployment.yaml"
             }
         }
 
@@ -47,7 +47,7 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline completed successfully! Argo CD will auto-sync the new manifest changes."
+            echo "Pipeline completed successfully!"
         }
         failure {
             echo "Pipeline failed. Check stage logs for details."
