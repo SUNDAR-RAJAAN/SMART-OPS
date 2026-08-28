@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smartops-app
+  labels:
+    app: smartops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smartops
+  template:
+    metadata:
+      labels:
+        app: smartops
+    spec:
+      containers:
+      - name: smartops
+        image: docker.io/sundarrajaan/smartops:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smartops-service
+spec:
+  type: NodePort
+  selector:
+    app: smartops
+  ports:
+  - port: 8080
+    targetPort: 8080
+    nodePort: 30080
