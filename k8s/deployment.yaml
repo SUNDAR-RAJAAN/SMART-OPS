@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
       - name: smartops
-        image: docker.io/sundarrajaan/smartops:latest
-        imagePullPolicy: Always
+        image: smartops:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 8080
 ---
