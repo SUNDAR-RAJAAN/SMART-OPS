@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    triggers {
+        pollSCM('H/2 * * * *')
+    }
+
     environment {
         APP_NAME = 'smartops'
         IMAGE_TAG = "v${BUILD_NUMBER}"
