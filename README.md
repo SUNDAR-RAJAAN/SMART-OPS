@@ -1,6 +1,6 @@
 # SmartOps 🚀
 
-SmartOps is a cloud-native application featuring a **Go** backend server and a **Node.js (Vite)** frontend client. This repository demonstrates an automated GitOps CI/CD pipeline built with **Jenkins**, **Docker**, **Minikube**, and **Argo CD**.
+SmartOps is a cloud-native application featuring a **Go** backend server and a **Node.js (Vite)** frontend client. This repository demonstrates an automated GitOps CI/CD pipeline built with **Jenkins**, **Docker**, **Minikube**, and **Argo BD**.
 
 ---
 
