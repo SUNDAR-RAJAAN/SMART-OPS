@@ -41,7 +41,7 @@ pipeline {
             steps {
                 echo "Applying deployment to Minikube..."
                 sh "kubectl apply -f k8s/deployment.yaml"
-                sh "kubectl rollout status deployment/smartops-app --timeout=60s"
+                sh "kubectl rollout status deployment/smartops-app --timeout=180s"
             }
         }
     }
