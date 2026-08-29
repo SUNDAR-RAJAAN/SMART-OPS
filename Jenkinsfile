@@ -15,8 +15,8 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                echo "Building Docker image: ${APP_NAME}:${IMAGE_TAG}"
-                sh "docker build --no-cache -t ${APP_NAME}:${IMAGE_TAG} ."
+                echo "Building Docker image using layer caching: ${APP_NAME}:${IMAGE_TAG}"
+                sh "docker build -t ${APP_NAME}:${IMAGE_TAG} ."
                 sh "docker tag ${APP_NAME}:${IMAGE_TAG} ${APP_NAME}:latest"
             }
         }
@@ -31,14 +31,15 @@ pipeline {
 
         stage('Update K8s Manifest') {
             steps {
-                echo "Updating k8s/deployment.yaml with tag ${IMAGE_TAG}"
+                echo "Updating k8s/deployment.yaml..."
                 sh "sed -i 's|image: ${APP_NAME}:.*|image: ${APP_NAME}:${IMAGE_TAG}|g' k8s/deployment.yaml"
+                sh "sed -i 's|imagePullPolicy: .*|imagePullPolicy: IfNotPresent|g' k8s/deployment.yaml"
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                echo "Applying updated deployment to Minikube..."
+                echo "Applying deployment to Minikube..."
                 sh "kubectl apply -f k8s/deployment.yaml"
                 sh "kubectl rollout status deployment/smartops-app --timeout=60s"
             }
@@ -47,7 +48,7 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline completed successfully!"
+            echo "Pipeline completed successfully! Deployment rollout verified."
         }
         failure {
             echo "Pipeline failed. Check stage logs for details."
